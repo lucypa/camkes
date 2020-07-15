@@ -16,8 +16,11 @@ project(picotcp_tcp_echo C)
 
 includeGlobalComponents()
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> f713a07 (Move picotcp CMake settings to settings.cmake)
 set(CAmkESCPP ON CACHE BOOL "" FORCE)
 if("${KernelArch}" STREQUAL "x86")
     set(cpp_define -DKernelArchX86)
