@@ -1,5 +1,9 @@
 #
+<<<<<<< HEAD
 # Copyright 2019, Data61
+=======
+# Copyright 2020, Data61
+>>>>>>> 7efca8f (picotcp_single_component: Add picotcp example)
 # Commonwealth Scientific and Industrial Research Organisation (CSIRO)
 # ABN 41 687 119 230.
 #
@@ -26,8 +30,13 @@ if("${KernelArch}" STREQUAL "x86")
 endif()
 
 set(LibEthdriverRXDescCount 256 CACHE STRING "" FORCE)
+<<<<<<< HEAD
 set(LibEthdriverTXDescCount 512 CACHE STRING "" FORCE)
 
 # Print at runtime
 set(KernelPrinting ON CACHE BOOL "" FORCE)
 set(KernelDebugBuild ON CACHE BOOL "" FORCE)
+=======
+set(LibEthdriverTXDescCount 256 CACHE STRING "" FORCE)
+set(CAmkESNoFPUByDefault ON CACHE BOOL "" FORCE)
+>>>>>>> 7efca8f (picotcp_single_component: Add picotcp example)

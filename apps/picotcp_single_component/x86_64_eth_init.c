@@ -1,13 +1,24 @@
 /*
+<<<<<<< HEAD
  * Copyright 2019, Data61
+=======
+ * Copyright 2020, Data61
+>>>>>>> 7efca8f (picotcp_single_component: Add picotcp example)
  * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
  * ABN 41 687 119 230.
  *
  * This software may be distributed and modified according to the terms of
+<<<<<<< HEAD
  * the GNU General Public License version 2. Note that NO WARRANTY is provided.
  * See "LICENSE_GPLv2.txt" for details.
  *
  * @TAG(DATA61_GPL)
+=======
+ * the BSD 2-Clause license. Note that NO WARRANTY is provided.
+ * See "LICENSE_BSD2.txt" for details.
+ *
+ * @TAG(DATA61_BSD)
+>>>>>>> 7efca8f (picotcp_single_component: Add picotcp example)
  */
 
 #include <camkes.h>
@@ -18,6 +29,7 @@
 
 int ethif_init(struct eth_driver *eth_driver, ps_io_ops_t *io_ops)
 {
+<<<<<<< HEAD
     ps_irq_t irq_info = (ps_irq_t) {
         .type = PS_IOAPIC, .ioapic = { .ioapic = 0, .pin = 20,
                                        .level = 1, .polarity = 1,
@@ -25,6 +37,8 @@ int ethif_init(struct eth_driver *eth_driver, ps_io_ops_t *io_ops)
                                      }
     };
 
+=======
+>>>>>>> 7efca8f (picotcp_single_component: Add picotcp example)
     ethif_intel_config_t *eth_config = calloc(1, sizeof(ethif_intel_config_t) + sizeof(ps_irq_t));
     *eth_config = (ethif_intel_config_t) {
         /* Ethdriver component dataport */
