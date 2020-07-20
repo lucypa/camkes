@@ -35,8 +35,11 @@ set(KernelPrinting ON CACHE BOOL "" FORCE)
 set(KernelDebugBuild ON CACHE BOOL "" FORCE)
 =======
 set(CAmkESNoFPUByDefault ON CACHE BOOL "" FORCE)
+<<<<<<< HEAD
 
 # Print at runtime
 # set(KernelPrinting ON CACHE BOOL "" FORCE)
 # set(KernelDebugBuild ON CACHE BOOL "" FORCE)
 >>>>>>> f713a07 (Move picotcp CMake settings to settings.cmake)
+=======
+>>>>>>> c25c1db (picotcp_tcp_echo: Use async socket interfaces)
