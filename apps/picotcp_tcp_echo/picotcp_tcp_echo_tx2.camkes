@@ -167,6 +167,11 @@ component EthdriverARMPlatDF {
      * This attribute is set according to whatever configuration you want.
      */
     attribute int promiscuous_mode = 1;
+<<<<<<< HEAD
+=======
+    attribute int heap_size = 0x10000;
+    attribute int dma_pool_cached = 0;
+>>>>>>> b7dd667 (picotcp_tcp_echo,tx2: Use uncached DMA mappings)
     attribute int dma_pool = 0x4000;
     attribute int dma_pool_cached = 0;
     attribute int heap_size = 0x40000;
