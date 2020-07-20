@@ -1,3 +1,18 @@
+<<<<<<< HEAD
+=======
+<!--
+     Copyright 2020, Data61
+     Commonwealth Scientific and Industrial Research Organisation (CSIRO)
+     ABN 41 687 119 230.
+
+     This software may be distributed and modified according to the terms of
+     the BSD 2-Clause license. Note that NO WARRANTY is provided.
+     See "LICENSE_BSD2.txt" for details.
+
+     @TAG(DATA61_BSD)
+-->
+
+>>>>>>> 25d4d71 (picotcp_tcp_echo: Add README.md)
 # Picotcp echo server example
 
 This echo server listens on 3 ports:
@@ -65,6 +80,7 @@ by the total number of cycles spent processing the event.
 
 ```
 Measurment starting...
+<<<<<<< HEAD
 total,78102218484
 idle,0
 kernel,12270142352
@@ -105,5 +121,283 @@ ernet,3297943,2835136012
 pico_server_tick,2368,26574836
 client_event_handler,1641489,6828125924
 notify_client,3297946,2885003836
+=======
+total,58777271911
+idle,0
+kernel,923710938
+{
+  "BENCHMARK_TOTAL_UTILISATION":58777271911,
+  "BENCHMARK_TOTAL_KERNEL_UTILISATION":923710938,
+  "BENCHMARK_TOTAL_NUMBER_KERNEL_ENTRIES":1837568,
+  "BENCHMARK_TOTAL_NUMBER_SCHEDULES":273465,
+  "BENCHMARK_TCB_": [
+    {
+      "NAME":"time_server:the_timer",
+      "UTILISATION":14049847,
+      "NUMBER_SCHEDULES":5560,
+      "KERNEL_UTILISATION":6403362,
+      "NUMBER_KERNEL_ENTRIES":5560
+    },
+    {
+      "NAME":"time_server:nv_timer",
+      "UTILISATION":63687333,
+      "NUMBER_SCHEDULES":6810,
+      "KERNEL_UTILISATION":10281140,
+      "NUMBER_KERNEL_ENTRIES":17053
+    },
+    {
+      "NAME":"time_server:control",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"serial_server:serial_dev",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"serial_server:processed_putchar",
+      "UTILISATION":47813649,
+      "NUMBER_SCHEDULES":7334,
+      "KERNEL_UTILISATION":5789123,
+      "NUMBER_KERNEL_ENTRIES":8550
+    },
+    {
+      "NAME":"serial_server:control",
+      "UTILISATION":170729,
+      "NUMBER_SCHEDULES":111,
+      "KERNEL_UTILISATION":95688,
+      "NUMBER_KERNEL_ENTRIES":222
+    },
+    {
+      "NAME":"reset_server:control",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"picoserver:trace_stop",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"picoserver:trace_start",
+      "UTILISATION":1994,
+      "NUMBER_SCHEDULES":1,
+      "KERNEL_UTILISATION":938,
+      "NUMBER_KERNEL_ENTRIES":1
+    },
+    {
+      "NAME":"picoserver:control",
+      "UTILISATION":48985408582,
+      "NUMBER_SCHEDULES":136881,
+      "KERNEL_UTILISATION":164628654,
+      "NUMBER_KERNEL_ENTRIES":260965
+    },
+    {
+      "NAME":"gpiomux_server:mux",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"gpiomux_server:gpio",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"gpiomux_server:control",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"ethdriver:trace_stop",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"ethdriver:trace_start",
+      "UTILISATION":2479,
+      "NUMBER_SCHEDULES":1,
+      "KERNEL_UTILISATION":1395,
+      "NUMBER_KERNEL_ENTRIES":1
+    },
+    {
+      "NAME":"ethdriver:control",
+      "UTILISATION":3728117922,
+      "NUMBER_SCHEDULES":46063,
+      "KERNEL_UTILISATION":661280085,
+      "NUMBER_KERNEL_ENTRIES":1474493
+    },
+    {
+      "NAME":"eth0d1:control",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"eth0d0:control",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"echod1:control",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"echod0:control",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"echo:trace_stop",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"echo:trace_start",
+      "UTILISATION":2381,
+      "NUMBER_SCHEDULES":1,
+      "KERNEL_UTILISATION":1029,
+      "NUMBER_KERNEL_ENTRIES":1
+    },
+    {
+      "NAME":"echo:control",
+      "UTILISATION":190169008,
+      "NUMBER_SCHEDULES":66134,
+      "KERNEL_UTILISATION":72441168,
+      "NUMBER_KERNEL_ENTRIES":66154
+    },
+    {
+      "NAME":"clock_server:car",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"clock_server:control",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"bpmp_server:hsp",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"bpmp_server:control",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"bench:idle",
+      "UTILISATION":3220,
+      "NUMBER_SCHEDULES":2,
+      "KERNEL_UTILISATION":1609,
+      "NUMBER_KERNEL_ENTRIES":2
+    },
+    {
+      "NAME":"bench:bench_to",
+      "UTILISATION":5747844767,
+      "NUMBER_SCHEDULES":4566,
+      "KERNEL_UTILISATION":2786747,
+      "NUMBER_KERNEL_ENTRIES":4566
+    },
+    {
+      "NAME":"bench:control",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"idle_thread",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":1,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    },
+    {
+      "NAME":"rootserver",
+      "UTILISATION":0,
+      "NUMBER_SCHEDULES":0,
+      "KERNEL_UTILISATION":0,
+      "NUMBER_KERNEL_ENTRIES":0
+    }
+  ]
+}
+traces:ethdriver
+total_endpoint_calls,143519
+cycles,942968
+total_notifications,143519
+cycles,4015637001
+irq_handlers,124985
+cycles,1439198942
+tx_event,37278
+cycles,2563376277
+rx_buffers_available_event,0
+cycles,0
+notify_client,143519
+cycles,2893493
+traces:picoserver
+total_endpoint_calls,116020
+cycles,1412327
+total_notifications,116009
+cycles,48968713983
+irq_handlers,0
+cycles,1273829
+ethernet_event_handler,44405
+cycles,44360278745
+client_event_handler,66045
+cycles,4157066253
+notify_ethernet,116009
+cycles,3796540
+pico_server_tick,5559
+cycles,372728925
+notify_client,116009
+cycles,62344453
+traces:echo
+total_endpoint_calls,66048
+cycles,422112
+total_notifications,66048
+cycles,102229239
+irq_handlers,0
+cycles,3283110
+async_notification,66045
+cycles,90497677
+sync_notification,3
+cycles,4516750
+>>>>>>> 25d4d71 (picotcp_tcp_echo: Add README.md)
 echo: Connection established with 10.13.1.11 on socket 3
 ```
