@@ -61,12 +61,12 @@ static tx_msg_t *get_msg_from_queue(virtqueue_driver_t *queue)
 
     vq_flags_t flag;
     void *buf;
-    int more = virtqueue_gather_used(queue, &handle, &buf, &len, &flag);
-    if (more == 0) {
+    int error = camkes_virtqueue_driver_gather_buffer(queue, &handle, &buf, &len, &flag);
+    if (error) {
         ZF_LOGE("Failed to dequeue message from the virtqueue");
     }
 
-    return DECODE_DMA_ADDRESS(buf);
+    return buf;
 }
 
 static void handle_async_events(UNUSED seL4_Word badge, UNUSED void *cookie)
