@@ -72,7 +72,6 @@ static tx_msg_t *get_msg_from_queue(virtqueue_driver_t *queue)
         ZF_LOGE("Failed to dequeue message from the virtqueue");
     }
 
-    //trace_extra_point_end(0, 1);
     return buf;
 }
 
