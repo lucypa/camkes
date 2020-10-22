@@ -38,7 +38,7 @@ component Ethdriver82574_1 {
     x86_iospace_dma_interfaces(init_iospaces, "0x12:0x0:0x19:0")
     lwip_base_interfaces(lwip_base)
     BenchUtiliz_control_interfaces(idle)
-    SerialServer_putchar_printf_client(putchar)
+    //SerialServer_putchar_printf_client(putchar)
     /*
      * The promiscuous mode is set according to whatever configuration you want, 1 by default.
      */
@@ -120,11 +120,11 @@ assembly {
 #ifdef KernelArchX86
         component Ethdriver82574_1 ethdriver;
 #endif /* KernelArchX86 */
-        component TimeServer time_server;
-        component SerialServer serial_server;
+        //component TimeServer time_server;
+        //component SerialServer serial_server;
 
-        connection seL4TimeServer serialserver_timer (from serial_server.timeout, to time_server.the_timer);
-        SerialServer_processed_putchar_printf_connection(putchar, ethdriver, serial_server)
+        //connection seL4TimeServer serialserver_timer (from serial_server.timeout, to time_server.the_timer);
+        //SerialServer_processed_putchar_printf_connection(putchar, ethdriver, serial_server)
 
         component BenchUtiliz bench;
         BenchUtiliz_trace_connections(trace, ethdriver, bench)
@@ -137,11 +137,11 @@ assembly {
         /*
          * Non-platform specific configurations
          */
-        time_server.timers_per_client = 8;
+        //time_server.timers_per_client = 8;
 
         ethdriver.trace_stop_priority = 255;
-        ethdriver.enable_tracing = 1;
+        //ethdriver.enable_tracing = 1;
 
-        lwip_base_configuration(ethdriver, lwip_base, "", "0.0.0.0")
+        lwip_base_configuration(ethdriver, lwip_base, "10.13.1.100", "0.0.0.0")
     }
 }
