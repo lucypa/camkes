@@ -181,6 +181,7 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
 {
     if (p->tot_len > BUF_SIZE) {
         ZF_LOGF("len %hu is invalid in lwip_eth_send", p->tot_len);
+        return ERR_MEM;
     }
 
     if (num_tx == 0) {
@@ -305,8 +306,8 @@ int setup_e0(ps_io_ops_t *io_ops)
     LWIP_MEMPOOL_INIT(RX_POOL);
 
     struct ip4_addr netmask, ipaddr, gw, multicast;
-    ipaddr_aton("0.0.0.0", &gw);
-    ipaddr_aton("0.0.0.0", &ipaddr);
+    ipaddr_aton("10.13.0.1", &gw);
+    ipaddr_aton("10.13.1.100", &ipaddr);
     ipaddr_aton("0.0.0.0", &multicast);
     ipaddr_aton("255.255.255.0", &netmask);
 
@@ -318,6 +319,9 @@ int setup_e0(ps_io_ops_t *io_ops)
     netif_set_default(&netif);
 
     single_threaded_component_register_handler(0, "sys_check_timeouts", tick_on_event, NULL);
+
+    error = trace_extra_point_register_name(0, "inet_pseudo_chksum");
+    ZF_LOGF_IF(error, "Failed to register extra trace point 0");
 
     return 0;
 

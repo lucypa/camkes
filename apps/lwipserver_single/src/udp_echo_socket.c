@@ -28,9 +28,15 @@ static struct udp_pcb *udp_socket;
 
 static void lwip_udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
 {
+    //trace_extra_point_start(6);
+    //trace_extra_point_start(7);
     err_t error = udp_sendto(pcb, p, addr, port);
+    //trace_extra_point_end(7, 1);
     ZF_LOGF_IF(error, "Failed to send UDP packet through socket");
+    //trace_extra_point_start(4);
     pbuf_free(p);
+    //trace_extra_point_end(4, 1);
+    //trace_extra_point_end(6, 1);
 }
 
 int setup_udp_socket(UNUSED ps_io_ops_t *io_ops)

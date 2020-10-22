@@ -20,6 +20,7 @@ virtqueue_driver_t rx_virtqueue;
 
 static void handle_lwipserver_events(UNUSED seL4_Word badge, UNUSED void *cookie)
 {
+    //trace_extra_point_start(1);
     echo_control_poll_events(tcp_socket);
     if (peer_tcp_socket != -1) {
         echo_control_poll_events(peer_tcp_socket);
@@ -40,19 +41,24 @@ static void handle_lwipserver_events(UNUSED seL4_Word badge, UNUSED void *cookie
             break;
         }
         if (event.socket_fd == tcp_socket || event.socket_fd == peer_tcp_socket) {
+            //trace_extra_point_end(1, 1);
             handle_tcp_event(&event);
+            //trace_extra_point_start(1);
         } else if (event.socket_fd == utilization_socket ||
                    event.socket_fd == peer_utilization_socket) {
+            //trace_extra_point_end(1, 1);
             handle_utilization_event(&event);
+            //trace_extra_point_start(1);
         } else {
             ZF_LOGF("Invalid socket %d", event.socket_fd);
         }
     }
-    tx_virtqueue.notify();
+    //trace_extra_point_end(1, 1);
 }
 
 static tx_msg_t *get_msg_from_queue(virtqueue_driver_t *queue)
 {
+    //trace_extra_point_start(0);
     virtqueue_ring_object_t handle;
     uint32_t len;
     if (virtqueue_get_used_buf(queue, &handle, &len) == 0) {
@@ -66,11 +72,13 @@ static tx_msg_t *get_msg_from_queue(virtqueue_driver_t *queue)
         ZF_LOGE("Failed to dequeue message from the virtqueue");
     }
 
+    //trace_extra_point_end(0, 1);
     return buf;
 }
 
 static void handle_async_events(UNUSED seL4_Word badge, UNUSED void *cookie)
 {
+    //trace_extra_point_start(2);
     /* Handle responses from the TX virtqueue */
     while (true) {
         tx_msg_t *msg = get_msg_from_queue(&tx_virtqueue);
@@ -99,6 +107,7 @@ static void handle_async_events(UNUSED seL4_Word badge, UNUSED void *cookie)
             ZF_LOGE("Message received but bad socket: %d", msg->socket_fd);
         }
     }
+    //trace_extra_point_end(2, 1);
     tx_virtqueue.notify();
 }
 
@@ -127,6 +136,17 @@ static int setup_echo_server(UNUSED ps_io_ops_t *io_ops)
     error = single_threaded_component_register_handler(tx_badge, "echo_async_notification",
                                                        handle_async_events, NULL);
     ZF_LOGF_IF(error, "Failed to reigster the async event handler for Echo");
+
+    /*
+    error = trace_extra_point_register_name(0, "get_msg_from_queue");
+    ZF_LOGF_IF(error, "Failed to register extra trace point 0");
+
+    error = trace_extra_point_register_name(1, "handle_lwipserver_events");
+    ZF_LOGF_IF(error, "Failed to register extra trace point 1");
+
+    error = trace_extra_point_register_name(2, "handle_async_events");
+    ZF_LOGF_IF(error, "Failed to register extra trace point 2");
+    */
 
     printf("%s instance starting up, going to be listening on TCP port %d and receiving on UDP port %d\n",
            get_instance_name(), TCP_ECHO_PORT, UDP_ECHO_PORT);
