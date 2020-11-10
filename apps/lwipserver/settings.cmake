@@ -19,11 +19,13 @@ set(LibEthdriverNumPreallocatedBuffers 32 CACHE STRING "" FORCE)
 set(CAmkESDMALargeFramePromotion OFF CACHE BOOL "" FORCE)
 
 # The app has only been tested on hardware, and not on QEMU
-set(SIMULATION OFF CACHE BOOL "" FORCE)
+# set(SIMULATION OFF CACHE BOOL "" FORCE)
 if("${KernelArch}" STREQUAL "x86")
     # The IOMMU is required for the Ethdriver component on x86
     set(KernelIOMMU ON CACHE BOOL "" FORCE)
 endif()
+
+set(cpp_define -DKernelArchArm)
 
 set(LibEthdriverRXDescCount 256 CACHE STRING "" FORCE)
 set(LibEthdriverTXDescCount 512 CACHE STRING "" FORCE)

@@ -26,10 +26,10 @@ static void handle_lwipserver_events(UNUSED seL4_Word badge, UNUSED void *cookie
         echo_control_poll_events(peer_tcp_socket);
     }
 
-    echo_control_poll_events(utilization_socket);
-    if (peer_utilization_socket != -1) {
-        echo_control_poll_events(peer_utilization_socket);
-    }
+    // echo_control_poll_events(utilization_socket);
+    // if (peer_utilization_socket != -1) {
+    //     echo_control_poll_events(peer_utilization_socket);
+    // }
 
     lwipserver_event_t event;
     while (1) {
@@ -66,9 +66,9 @@ static tx_msg_t *get_msg_from_queue(virtqueue_driver_t *queue)
     }
 
     vq_flags_t flag;
-    void *buf;
-    int error = camkes_virtqueue_driver_gather_buffer(queue, &handle, &buf, &len, &flag);
-    if (error) {
+    uint64_t buf;
+    int more = virtqueue_gather_used(queue, &handle, &buf, &len, &flag);
+    if (more == 0) {
         ZF_LOGE("Failed to dequeue message from the virtqueue");
     }
 
