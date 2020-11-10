@@ -37,7 +37,6 @@
 #include <echo/tuning_params.h>
 
 #include <utils/fence.h>
-#include <platsupport/arch/tsc.h>
 
 struct eth_driver *eth_driver;
 struct netif netif;
@@ -198,7 +197,6 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     /* queue up transmit */
     int err = eth_driver->i_fn.raw_tx(eth_driver, 1, (uintptr_t *) & (tx_buf->phys),
                                       &len, tx_buf);
-
     switch (err) {
     case ETHIF_TX_FAILED:
         tx_buf_pool[num_tx] = tx_buf;
