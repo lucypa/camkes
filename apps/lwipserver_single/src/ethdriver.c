@@ -38,8 +38,11 @@
 
 #include <utils/fence.h>
 
+#define LINK_SPEED 1000000000 // Gigabit
+
 struct eth_driver *eth_driver;
 struct netif netif;
+ps_io_ops_t *ops;
 
 /*
  *Struct eth_buf contains a virtual address (buf) to use for memory operations
@@ -85,11 +88,21 @@ eth_buf_t *tx_buf_pool[TX_BUFS];
 static int num_rx_bufs;
 static eth_buf_t *rx_buf_pool[RX_BUFS];
 
+void *rx_buf_base;
+void *rx_buf_top;
+
 static void eth_tx_complete(void *iface, void *cookie)
 {
     eth_buf_t *buf = (eth_buf_t *) cookie;
-    tx_buf_pool[num_tx] = buf;
-    num_tx++;
+
+    if ((uintptr_t) rx_buf_base <= (uintptr_t) buf->buf &&
+        (uintptr_t) buf->buf <= (uintptr_t) rx_buf_top) {
+        rx_buf_pool[num_rx_bufs] = buf;
+        num_rx_bufs++;
+    } else {
+        tx_buf_pool[num_tx] = buf;
+        num_tx++;
+    }
 }
 
 static uintptr_t eth_allocate_rx_buf(void *iface, size_t buf_size, void **cookie)
@@ -98,7 +111,13 @@ static uintptr_t eth_allocate_rx_buf(void *iface, size_t buf_size, void **cookie
         return 0;
     }
     if (num_rx_bufs == 0) {
-        return 0;
+        if (num_tx == 0) {
+            ZF_LOGE("no rx bufs");
+            return 0;
+        }
+        num_tx--;
+        *cookie = tx_buf_pool[num_tx];
+        return tx_buf_pool[num_tx]->phys;
     }
     num_rx_bufs--;
     *cookie = rx_buf_pool[num_rx_bufs];
@@ -109,10 +128,12 @@ static void eth_rx_complete(void *iface, unsigned int num_bufs, void **cookies, 
 {
     /* insert filtering here. currently everything just goes to one client */
     if (num_bufs != 1) {
+        ZF_LOGE("wat");
         goto error;
     }
     eth_buf_t *curr_buf = cookies[0];
     if ((pending_rx_head + 1) % RX_BUFS == pending_rx_tail) {
+        ZF_LOGE("error");
         goto error;
     }
     curr_buf->len = lens[0];
@@ -144,8 +165,10 @@ static void lwip_free_buf(struct pbuf *buf)
 {
     lwip_custom_pbuf_t *custom_pbuf = (lwip_custom_pbuf_t *) buf;
 
+    /*
     rx_buf_pool[num_rx_bufs] = custom_pbuf->eth_buf;
     num_rx_bufs++;
+    */
     LWIP_MEMPOOL_FREE(RX_POOL, custom_pbuf);
 }
 
@@ -188,19 +211,47 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
         return ERR_MEM;
     }
 
-    num_tx--;
-    eth_buf_t *tx_buf = tx_buf_pool[num_tx];
+    uintptr_t phys;
+    void *cookie = NULL;
+    unsigned int len;
 
-    /* copy the packet over */
-    pbuf_copy_partial(p, tx_buf->buf, p->tot_len, 0);
-    unsigned int len = p->tot_len;
-    /* queue up transmit */
-    int err = eth_driver->i_fn.raw_tx(eth_driver, 1, (uintptr_t *) & (tx_buf->phys),
-                                      &len, tx_buf);
+    /* zero-copy TX, keep in mind this is a hack that assumes that the buffer
+     * size is 2048 and also that the payload is less than 2048 */
+    int num_pbufs = 0;
+    for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
+        num_pbufs++;
+    }
+
+    if (num_pbufs == 2) {
+        struct pbuf *first_pbuf = p;
+        struct pbuf *second_pbuf = p->next;
+        ZF_LOGF_IF(second_pbuf->flags & PBUF_FLAG_IS_CUSTOM == 0, "second pbuf not custom!");
+        ZF_LOGF_IF((uintptr_t) second_pbuf->payload & 0xff != 42, "second pbuf not offset by 42!");
+        ZF_LOGF_IF(first_pbuf->len != 42, "first pbuf not 42!");
+        lwip_custom_pbuf_t *custom_pbuf = (lwip_custom_pbuf_t *) second_pbuf;
+        eth_buf_t *rx_buf = custom_pbuf->eth_buf;
+        memcpy(rx_buf->buf, first_pbuf->payload, 42);
+        len = first_pbuf->tot_len;
+        phys = rx_buf->phys;
+        cookie = rx_buf;
+        ps_dma_cache_clean(&ops->dma_manager, rx_buf->buf, len);
+    } else {
+        num_tx--;
+        eth_buf_t *tx_buf = tx_buf_pool[num_tx];
+        /* copy the packet over */
+        pbuf_copy_partial(p, tx_buf->buf, p->tot_len, 0);
+        len = p->tot_len;
+        phys = tx_buf->phys;
+        cookie = tx_buf;
+        ps_dma_cache_clean(&ops->dma_manager, tx_buf->buf, len);
+    }
+
+    int err = eth_driver->i_fn.raw_tx(eth_driver, 1, &phys, &len, cookie);
+
     switch (err) {
     case ETHIF_TX_FAILED:
-        tx_buf_pool[num_tx] = tx_buf;
-        num_tx++;
+        ZF_LOGF_IF(cookie == NULL, "cookie is NULL!");
+        eth_tx_complete(NULL, cookie);
         return ERR_MEM;
     case ETHIF_TX_COMPLETE:
     case ETHIF_TX_ENQUEUED:
@@ -231,7 +282,7 @@ static err_t ethernet_init(struct netif *netif)
     netif->hwaddr_len = ETHARP_HWADDR_LEN;
     netif->output = etharp_output;
     netif->linkoutput = lwip_eth_send;
-    NETIF_INIT_SNMP(netif, snmp_ifType_ethernet_csmacd, 1000000000);
+    NETIF_INIT_SNMP(netif, snmp_ifType_ethernet_csmacd, LINK_SPEED);
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_LINK_UP | NETIF_FLAG_IGMP;
 
     return ERR_OK;
@@ -247,6 +298,8 @@ static void netif_status_callback(struct netif *netif)
 
 int setup_e0(ps_io_ops_t *io_ops)
 {
+    ops = io_ops;
+
     int error = ps_interface_find(&io_ops->interface_registration_ops,
                                   PS_ETHERNET_INTERFACE, hardware_interface_searcher, NULL);
     if (error) {
@@ -264,6 +317,15 @@ int setup_e0(ps_io_ops_t *io_ops)
             return -1;
 
         }
+        if (i == 0) {
+            rx_buf_base = buf->buf;
+        }
+        if (rx_buf_base > buf->buf) {
+            rx_buf_base = buf->buf;
+        }
+        if (rx_buf_top < buf->buf) {
+            rx_buf_top = buf->buf;
+        }
         memset(buf->buf, 0, BUF_SIZE);
         buf->phys = ps_dma_pin(&io_ops->dma_manager, buf->buf, BUF_SIZE);
         if (!buf->phys) {
@@ -275,6 +337,7 @@ int setup_e0(ps_io_ops_t *io_ops)
         num_rx_bufs++;
 
     }
+    rx_buf_top += BUF_SIZE;
 
     for (int i = 0; i < TX_BUFS; i++) {
         eth_buf_t *buf = &tx_bufs[i];
@@ -305,7 +368,7 @@ int setup_e0(ps_io_ops_t *io_ops)
 
     struct ip4_addr netmask, ipaddr, gw, multicast;
     ipaddr_aton("10.13.0.1", &gw);
-    ipaddr_aton("10.13.1.100", &ipaddr);
+    ipaddr_aton("0.0.0.0", &ipaddr);
     ipaddr_aton("0.0.0.0", &multicast);
     ipaddr_aton("255.255.255.0", &netmask);
 
