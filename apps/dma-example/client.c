@@ -15,7 +15,8 @@
 #include <camkes.h>
 #include <camkes/dma.h>
 
-int run(void) {
+int run(void)
+{
     printf("Starting client...\n");
 
     /* Test the legacy allocation functions. */
@@ -23,7 +24,7 @@ int run(void) {
     printf("Allocating some DMA pages...\n");
     void *buffers[100];
     int i;
-    for (i = 0; i < sizeof(buffers) / sizeof(void*); i++) {
+    for (i = 0; i < sizeof(buffers) / sizeof(void *); i++) {
         buffers[i] = camkes_dma_alloc(4096, 4096, true);
         if (buffers[i] == NULL) {
             printf("Ran out of memory after %d of them\n", i);
@@ -33,7 +34,7 @@ int run(void) {
 
     printf("Reversing some offsets into them...\n");
     for (int j = 0; j < i; j++) {
-        printf(" vaddr %p reversed to %p\n", buffers[j] + j * 13, (void*)camkes_dma_get_paddr(buffers[j] + j * 13));
+        printf(" vaddr %p reversed to %p\n", buffers[j] + j * 13, (void *)camkes_dma_get_paddr(buffers[j] + j * 13));
     }
 
     printf("Freeing them...\n");
@@ -54,7 +55,7 @@ int run(void) {
         printf("%p\nReversing some offsets...\n", p);
         for (int j = 0; j < 7; j++) {
             printf(" vaddr %p reversed to %p\n", p + j * 0x513,
-                (void*)camkes_dma_get_paddr(p + j * 0x513));
+                   (void *)camkes_dma_get_paddr(p + j * 0x513));
         }
         camkes_dma_free(p, 0x2000);
     }
@@ -64,8 +65,8 @@ int run(void) {
 
     printf("Allocating with different alignment requirements...\n");
     for (int j = 0; j < 14; j++) {
-        printf(" Allocating 0x1000 with alignment %d...", 1<<j);
-        void *p = camkes_dma_alloc(0x1000, 1<<j, true);
+        printf(" Allocating 0x1000 with alignment %d...", 1 << j);
+        void *p = camkes_dma_alloc(0x1000, 1 << j, true);
         if (p == NULL) {
             printf("Failed\n");
         } else {

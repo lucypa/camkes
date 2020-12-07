@@ -12,7 +12,8 @@
 
 #include <camkes.h>
 
-int run(void) {
+int run(void)
+{
     f_foo();
     g_foo();
     return 0;

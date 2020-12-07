@@ -10,8 +10,7 @@
  * @TAG(DATA61_BSD)
  */
 
-#ifndef CTYPES_H_
-#define CTYPES_H_
+#pragma once
 
 typedef struct {
     char data[100];
@@ -20,5 +19,3 @@ typedef struct {
 typedef struct {
     char data[8192];
 } CStructBig;
-
-#endif

@@ -12,7 +12,8 @@
 
 #include <camkes.h>
 
-int run(void) {
+int run(void)
+{
 
     o_process("hello ");
 

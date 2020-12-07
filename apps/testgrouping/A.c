@@ -13,7 +13,8 @@
 #include <assert.h>
 #include <camkes.h>
 
-int run(void) {
+int run(void)
+{
     int x = 0;
 
     int y = p_increment(x);

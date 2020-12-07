@@ -10,11 +10,8 @@
  * @TAG(DATA61_BSD)
  */
 
-#ifndef _MYTYPE_
-#define _MYTYPE_
+#pragma once
 
 typedef struct {
     int i;
 } MyType_t;
-
-#endif

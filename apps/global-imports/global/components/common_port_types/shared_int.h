@@ -10,9 +10,7 @@
  * @TAG(DATA61_BSD)
  */
 
-#ifndef _SHARED_INT_H_
-#define _SHARED_INT_H_
+#pragma once
 typedef struct {
     int value;
 } shared_int_t;
-#endif
