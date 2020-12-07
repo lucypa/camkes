@@ -112,28 +112,29 @@ static uintptr_t eth_allocate_rx_buf(void *iface, size_t buf_size, void **cookie
     }
     if (num_rx_bufs == 0) {
         if (num_tx == 0) {
-            ZF_LOGE("no rx bufs");
             return 0;
         }
         num_tx--;
         *cookie = tx_buf_pool[num_tx];
-        return tx_buf_pool[num_tx]->phys;
+        ps_dma_cache_invalidate(&ops->dma_manager, tx_buf_pool[num_tx]->buf, buf_size);
+        //return tx_buf_pool[num_tx]->phys;
+        return ps_dma_pin(&ops->dma_manager, tx_buf_pool[num_tx]->buf, buf_size);
     }
     num_rx_bufs--;
     *cookie = rx_buf_pool[num_rx_bufs];
-    return rx_buf_pool[num_rx_bufs]->phys;
+    ps_dma_cache_invalidate(&ops->dma_manager, rx_buf_pool[num_rx_bufs]->buf, buf_size);
+    //return rx_buf_pool[num_rx_bufs]->phys;
+    return ps_dma_pin(&ops->dma_manager, rx_buf_pool[num_rx_bufs]->buf, buf_size);
 }
 
 static void eth_rx_complete(void *iface, unsigned int num_bufs, void **cookies, unsigned int *lens)
 {
     /* insert filtering here. currently everything just goes to one client */
     if (num_bufs != 1) {
-        ZF_LOGE("wat");
         goto error;
     }
     eth_buf_t *curr_buf = cookies[0];
     if ((pending_rx_head + 1) % RX_BUFS == pending_rx_tail) {
-        ZF_LOGE("error");
         goto error;
     }
     curr_buf->len = lens[0];
@@ -225,14 +226,17 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     if (num_pbufs == 2) {
         struct pbuf *first_pbuf = p;
         struct pbuf *second_pbuf = p->next;
+        /*
         ZF_LOGF_IF(second_pbuf->flags & PBUF_FLAG_IS_CUSTOM == 0, "second pbuf not custom!");
         ZF_LOGF_IF((uintptr_t) second_pbuf->payload & 0xff != 42, "second pbuf not offset by 42!");
         ZF_LOGF_IF(first_pbuf->len != 42, "first pbuf not 42!");
+        */
         lwip_custom_pbuf_t *custom_pbuf = (lwip_custom_pbuf_t *) second_pbuf;
         eth_buf_t *rx_buf = custom_pbuf->eth_buf;
         memcpy(rx_buf->buf, first_pbuf->payload, 42);
         len = first_pbuf->tot_len;
-        phys = rx_buf->phys;
+        //phys = rx_buf->phys;
+        phys = ps_dma_pin(&ops->dma_manager, rx_buf->buf, len);
         cookie = rx_buf;
         ps_dma_cache_clean(&ops->dma_manager, rx_buf->buf, len);
     } else {
@@ -241,9 +245,14 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
         /* copy the packet over */
         pbuf_copy_partial(p, tx_buf->buf, p->tot_len, 0);
         len = p->tot_len;
-        phys = tx_buf->phys;
+        //phys = tx_buf->phys;
+        phys = ps_dma_pin(&ops->dma_manager, tx_buf->buf, len);
         cookie = tx_buf;
         ps_dma_cache_clean(&ops->dma_manager, tx_buf->buf, len);
+    }
+
+    if (!phys) {
+        ZF_LOGF("Failed to pin the dma buf for sending");
     }
 
     int err = eth_driver->i_fn.raw_tx(eth_driver, 1, &phys, &len, cookie);
@@ -327,12 +336,14 @@ int setup_e0(ps_io_ops_t *io_ops)
             rx_buf_top = buf->buf;
         }
         memset(buf->buf, 0, BUF_SIZE);
+        /*
         buf->phys = ps_dma_pin(&io_ops->dma_manager, buf->buf, BUF_SIZE);
         if (!buf->phys) {
             ZF_LOGE("ps_dma_pin: Failed to return physical address.");
             return -1;
 
         }
+        */
         rx_buf_pool[num_rx_bufs] = buf;
         num_rx_bufs++;
 
@@ -348,12 +359,14 @@ int setup_e0(ps_io_ops_t *io_ops)
 
         }
         memset(buf->buf, 0, BUF_SIZE);
+        /*
         buf->phys = ps_dma_pin(&io_ops->dma_manager, buf->buf, BUF_SIZE);
         if (!buf->phys) {
             ZF_LOGE("ps_dma_pin: Failed to return physical address.");
             return -1;
 
         }
+        */
         tx_buf_pool[num_tx] = buf;
         num_tx++;
 
