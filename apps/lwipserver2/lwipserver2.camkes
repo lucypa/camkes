@@ -104,6 +104,9 @@ assembly {
     }
 
     configuration {
+        lwipserver._priority = 99;
+        ethdriver._priority = 98;
+
         /*
          * Non-platform specific configurations
          */
