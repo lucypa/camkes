@@ -158,6 +158,7 @@ static struct raw_iface_callbacks ethdriver_callbacks = {
 
 typedef struct lwip_custom_pbuf {
     struct pbuf_custom p;
+    bool is_echo;
     eth_buf_t *eth_buf;
 } lwip_custom_pbuf_t;
 LWIP_MEMPOOL_DECLARE(RX_POOL, RX_BUFS, sizeof(lwip_custom_pbuf_t), "Zero-copy RX pool");
@@ -166,10 +167,11 @@ static void lwip_free_buf(struct pbuf *buf)
 {
     lwip_custom_pbuf_t *custom_pbuf = (lwip_custom_pbuf_t *) buf;
 
-    /*
-    rx_buf_pool[num_rx_bufs] = custom_pbuf->eth_buf;
-    num_rx_bufs++;
-    */
+    if (!custom_pbuf->is_echo) {
+        rx_buf_pool[num_rx_bufs] = custom_pbuf->eth_buf;
+        num_rx_bufs++;
+    }
+
     LWIP_MEMPOOL_FREE(RX_POOL, custom_pbuf);
 }
 
@@ -207,11 +209,6 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
         return ERR_MEM;
     }
 
-    if (num_tx == 0) {
-        // No Ethernet frame buffers available
-        return ERR_MEM;
-    }
-
     uintptr_t phys;
     void *cookie = NULL;
     unsigned int len;
@@ -223,14 +220,17 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
         num_pbufs++;
     }
 
+    if (num_pbufs != 2 && num_tx == 0) {
+        // No Ethernet frame buffers available
+        return ERR_MEM;
+    }
+
     if (num_pbufs == 2) {
         struct pbuf *first_pbuf = p;
         struct pbuf *second_pbuf = p->next;
-        /*
         ZF_LOGF_IF(second_pbuf->flags & PBUF_FLAG_IS_CUSTOM == 0, "second pbuf not custom!");
         ZF_LOGF_IF((uintptr_t) second_pbuf->payload & 0xff != 42, "second pbuf not offset by 42!");
         ZF_LOGF_IF(first_pbuf->len != 42, "first pbuf not 42!");
-        */
         lwip_custom_pbuf_t *custom_pbuf = (lwip_custom_pbuf_t *) second_pbuf;
         eth_buf_t *rx_buf = custom_pbuf->eth_buf;
         memcpy(rx_buf->buf, first_pbuf->payload, 42);
