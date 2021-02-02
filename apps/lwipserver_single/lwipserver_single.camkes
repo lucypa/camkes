@@ -43,10 +43,9 @@ component EthdriverARMPlat_1 {
     attribute int simple_untyped20_pool = 2;
     attribute int promiscuous_mode = 1;
     attribute int heap_size = 0x10000;
-    attribute int dma_pool = 0x1000;
+    attribute int dma_pool = 0x20000;
 
     dataport Buf cached_dma_pool;
-    dataport Buf dummy_dma_pool;
 
     consumes FDT EthDriver;
 	consumes FDT ocotp;
@@ -64,7 +63,6 @@ component EthdriverARMPlat_1 {
         connection seL4DTBHWThreadless ccm_conn(from ether_qos.resource, to ccm);
         connection seL4DTBHWThreadless analog_conn(from ether_qos.resource, to analog);
         connection seL4DTBHWThreadless gpio1_conn(from ether_qos.resource, to gpio1);
-        connection seL4DMASharedData dma_conn(from cached_dma_pool, to dummy_dma_pool);
 		fdt_bind_driver_connections();
     }
 
@@ -87,6 +85,7 @@ assembly {
     composition {
 
         component EthdriverARMPlat_1 ethdriver;
+        component Dummy dummy;
 
         component TimeServer time_server;
         component SerialServer serial_server;
@@ -94,6 +93,7 @@ assembly {
 
         connection seL4TimeServer serialserver_timer (from serial_server.timeout, to time_server.the_timer);
         SerialServer_processed_putchar_printf_connection(putchar, ethdriver, serial_server)
+        connection seL4DMASharedData dma_conn(from ethdriver.cached_dma_pool, to dummy.dma);
 
         lwip_base_connections(ethdriver, lwip_base, time_server.the_timer)
 
@@ -108,16 +108,14 @@ assembly {
         time_server.timers_per_client = 8;
 
         // ethdriver.trace_stop_priority = 255;
-        ethdriver.enable_tracing = 1;
-
-        // ethdriver.dma_pool_cached = True;
+        // ethdriver.enable_tracing = 1;
 
         BenchUtiliz_trace_configurations(trace, ethdriver, 103)
 
         lwip_base_configuration(ethdriver, lwip_base, "", "0.0.0.0")
         //lwip_base_configuration(ethdriver, lwip_base, "10.0.2.15", "0.0.0.0")
 
-        cached_dma_pool_dma.size = 0x200000;
-        cached_dma_pool_dma.controller = "ethdriver.cached_dma_pool";
+        dma_conn.size = 0x200000;
+        dma_conn.controller = "ethdriver.cached_dma_pool";
     }
 }
