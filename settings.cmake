@@ -79,7 +79,7 @@ Valid platforms are: \"${valid_platforms}\"")
 endif()
 
 if(SIMULATION)
-    ApplyCommonSimulationSettings(${KernelArch})
+    ApplyCommonSimulationSettings(${KernelSel4Arch})
 endif()
 
 ApplyCommonReleaseVerificationSettings(${RELEASE} FALSE)
