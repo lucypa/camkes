@@ -39,10 +39,14 @@ DeclareCAmkESComponent(
     ${libs}
 )
 
-DeclareCAmkESRootserver(
-    lwipserver2.camkes
-    CPP_FLAGS
-    ${cpp_define}
-)
-
 CAmkESAddCPPInclude("${CMAKE_CURRENT_LIST_DIR}/include/")
+
+if(KernelSel4ArchX86_64)
+    DeclareCAmkESComponent(Ethdriver82574DF SOURCES x86_64_eth_init.c LIBS "${ETHDRIVER_LIBS}")
+    DeclareCAmkESRootserver(lwipserver2_x86_64.camkes CPP_FLAGS ${cpp_define})
+elseif(KernelPlatformImx8mq-evk)
+    DeclareCAmkESRootserver(lwipserver2_imx8mq.camkes CPP_FLAGS ${cpp_define})
+else()
+    message(FATAL_ERROR "Unsupported platform.")
+endif()
+
