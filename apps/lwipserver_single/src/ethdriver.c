@@ -12,6 +12,9 @@
 
 #include <autoconf.h>
 #include <stdbool.h>
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
 
 #include <camkes.h>
 #include <camkes/dma.h>
@@ -33,6 +36,7 @@
 #include <lwip/ip.h>
 #include <lwip/dhcp.h>
 #include <lwip/timeouts.h>
+#include <lwip/sys.h>
 
 #include <echo/tuning_params.h>
 
@@ -45,242 +49,284 @@ struct netif netif;
 ps_io_ops_t *ops;
 
 /*
- *Struct eth_buf contains a virtual address (buf) to use for memory operations
- *at the picoserver level and a physical address to be passed down to the
- *driver.
+ * Ethernet buffers
+ * ================
  */
-typedef struct eth_buf {
-    char *buf;
+
+#define NUM_BUFFERS 512
+#define BUFFER_SIZE 2048
+
+/*
+ * These structures track the buffers used to construct packets
+ * sent via this network interface.
+ *
+ * As the interface is asynchronous, when a buffer is freed it isn't
+ * returned to the pool until any outstanding asynchronous use
+ * completes.
+ */
+typedef struct ethernet_buffer {
+    /* The acutal underlying memory of the buffer */
+    unsigned char *buffer;
+    /* The physical address of the buffer */
     uintptr_t phys;
-    size_t len;
-} eth_buf_t;
+    /* The physical size of the buffer */
+    size_t size;
+    /* Whether the buffer has been allocated */
+    bool allocated;
+    /* Whether the buffer is in use by the ethernet device */
+    bool in_async_use;
+} ethernet_buffer_t;
 
-eth_buf_t rx_bufs[RX_BUFS];
-eth_buf_t tx_bufs[TX_BUFS];
+/* Static pool of buffer metadata structures */
+static ethernet_buffer_t buffers[NUM_BUFFERS];
 
-/* keeps track of the head of the queue */
-int pending_rx_head;
-/* keeps track of the tail of the queue */
-int pending_rx_tail;
+/* Pool of free buffers */
+static ethernet_buffer_t *free_buffers[NUM_BUFFERS];
+static size_t num_free_buffers = 0;
 
-/*
- * this is a cyclic queue of RX buffers pending to be read by a client,
- * the head represents the first buffer in the queue, and the tail the last
- */
-eth_buf_t *pending_rx[RX_BUFS];
-
-/* keeps track of how many TX buffers are in use */
-int num_tx;
+/* Allocate a new buffer */
+static inline ethernet_buffer_t *alloc_buffer(size_t length);
 
 /*
- * this represents the pool of buffers that can be used for TX,
- * this array is a sliding array in that num_tx acts a pointer to
- * separate between buffers that are in use and buffers that are
- * not in use. E.g. 'o' = free, 'x' = in use
- *  -------------------------------------
- *  | o | o | o | o | o | o | x | x | x |
- *  -------------------------------------
- *                          ^
- *                        num_tx
+ * Free a buffer
+ *
+ * If the buffer is currently in used, the free will be delayed until
+ * the network operation is marked as complete.
  */
-eth_buf_t *tx_buf_pool[TX_BUFS];
+static inline void free_buffer(ethernet_buffer_t *buffer);
 
-static int num_rx_bufs;
-static eth_buf_t *rx_buf_pool[RX_BUFS];
+/*
+ * Mark a buffer as in-use for an asynchronous network operation.
+ *
+ * The buffer must be presently allocated and not already marked used.
+ */
+static inline void mark_buffer_used(ethernet_buffer_t *buffer);
 
-void *rx_buf_base;
-void *rx_buf_top;
+/* Remove the used marker after an asynchronous network operation has
+ * completed. */
+static inline void mark_buffer_unused(ethernet_buffer_t *buffer);
 
-static void eth_tx_complete(void *iface, void *cookie)
-{
-    eth_buf_t *buf = (eth_buf_t *) cookie;
+/*
+ * Ethernet device
+ * ===============
+ */
 
-    if ((uintptr_t) rx_buf_base <= (uintptr_t) buf->buf &&
-        (uintptr_t) buf->buf <= (uintptr_t) rx_buf_top) {
-        rx_buf_pool[num_rx_bufs] = buf;
-        num_rx_bufs++;
-    } else {
-        tx_buf_pool[num_tx] = buf;
-        num_tx++;
-    }
-}
+/* Callback for completion of frame transfer */
+static void tx_complete(void *iface, void *cookie);
 
-static uintptr_t eth_allocate_rx_buf(void *iface, size_t buf_size, void **cookie)
-{
-    if (buf_size > BUF_SIZE) {
-        return 0;
-    }
-    if (num_rx_bufs == 0) {
-        if (num_tx == 0) {
-            return 0;
-        }
-        num_tx--;
-        *cookie = tx_buf_pool[num_tx];
-        ps_dma_cache_invalidate(&ops->dma_manager, tx_buf_pool[num_tx]->buf, buf_size);
-        //return tx_buf_pool[num_tx]->phys;
-        return ps_dma_pin(&ops->dma_manager, tx_buf_pool[num_tx]->buf, buf_size);
-    }
-    num_rx_bufs--;
-    *cookie = rx_buf_pool[num_rx_bufs];
-    ps_dma_cache_invalidate(&ops->dma_manager, rx_buf_pool[num_rx_bufs]->buf, buf_size);
-    //return rx_buf_pool[num_rx_bufs]->phys;
-    return ps_dma_pin(&ops->dma_manager, rx_buf_pool[num_rx_bufs]->buf, buf_size);
-}
+/* Callback for frame receive */
+static void rx_complete(
+    void *iface,
+    unsigned int num_bufs,
+    void **cookies,
+    unsigned int *lens
+);
 
-static void eth_rx_complete(void *iface, unsigned int num_bufs, void **cookies, unsigned int *lens)
-{
-    /* insert filtering here. currently everything just goes to one client */
-    if (num_bufs != 1) {
-        goto error;
-    }
-    eth_buf_t *curr_buf = cookies[0];
-    if ((pending_rx_head + 1) % RX_BUFS == pending_rx_tail) {
-        goto error;
-    }
-    curr_buf->len = lens[0];
-    pending_rx[pending_rx_head] = curr_buf;
-    pending_rx_head = (pending_rx_head + 1) % RX_BUFS;
-    return;
-error:
-    /* abort and put all the bufs back */
-    for (int i = 0; i < num_bufs; i++) {
-        eth_buf_t *returned_buf = cookies[i];
-        rx_buf_pool[num_rx_bufs] = returned_buf;
-        num_rx_bufs++;
-    }
-}
+/* Callback for allocation request of frame for receive */
+static uintptr_t allocate_rx_buf(
+    void *iface,
+    size_t buf_size,
+    void **cookie
+);
 
 static struct raw_iface_callbacks ethdriver_callbacks = {
-    .tx_complete = eth_tx_complete,
-    .rx_complete = eth_rx_complete,
-    .allocate_rx_buf = eth_allocate_rx_buf
+    .tx_complete = tx_complete,
+    .rx_complete = rx_complete,
+    .allocate_rx_buf = allocate_rx_buf
 };
 
-typedef struct lwip_custom_pbuf {
-    struct pbuf_custom p;
-    bool is_echo;
-    eth_buf_t *eth_buf;
-} lwip_custom_pbuf_t;
-LWIP_MEMPOOL_DECLARE(RX_POOL, RX_BUFS, sizeof(lwip_custom_pbuf_t), "Zero-copy RX pool");
+/*
+ * Network interface
+ * =================
+ */
 
-static void lwip_free_buf(struct pbuf *buf)
+/* Custom buffers used for network interface */
+typedef struct lwip_custom_pbuf {
+    struct pbuf_custom custom;
+    ethernet_buffer_t *buffer;
+} lwip_custom_pbuf_t;
+LWIP_MEMPOOL_DECLARE(
+    RX_POOL,
+    NUM_BUFFERS,
+    sizeof(lwip_custom_pbuf_t),
+    "Zero-copy RX pool"
+);
+
+/* Receive a buffer from the network and pass to LwIP */
+static void interface_receive(ethernet_buffer_t *buffer, size_t length);
+
+/* Create an LwIP buffer from an ethernet buffer */
+static struct pbuf *create_interface_buffer(
+    ethernet_buffer_t *buffer,
+    size_t length
+);
+
+/* Free a buffer used by LwIP */
+static void interface_free_buffer(struct pbuf *buf);
+
+/* Initialisation for the LwIP interface */
+static err_t interface_init(struct netif *netif);
+
+/* Send an ethernet frame via the interface */
+static err_t interface_eth_send(struct netif *netif, struct pbuf *p);
+
+/*
+ * Ethernet buffers
+ * ================
+ */
+
+static inline ethernet_buffer_t *alloc_buffer(size_t length)
 {
+    if (num_free_buffers > 0) {
+        num_free_buffers -= 1;
+        ethernet_buffer_t *buffer =  free_buffers[num_free_buffers];
+
+        if (buffer->size < length) {
+            /* Requested size too large */
+            num_free_buffers += 1;
+            return NULL;
+        } else {
+            buffer->allocated = true;
+            return buffer;
+        }
+    } else {
+        return NULL;
+    }
+}
+
+static inline void free_buffer(ethernet_buffer_t *buffer)
+{
+    assert(buffer != NULL);
+    assert(buffer->allocated);
+    assert(num_free_buffers <= NUM_BUFFERS);
+
+    if (!buffer->in_async_use) {
+        free_buffers[num_free_buffers] = buffer;
+        num_free_buffers += 1;
+    }
+
+    buffer->allocated = false;
+}
+
+static inline void mark_buffer_used(ethernet_buffer_t *buffer)
+{
+    assert(buffer != NULL);
+    assert(buffer->allocated);
+    assert(!buffer->in_async_use);
+
+    buffer->in_async_use = true;
+}
+
+static inline void mark_buffer_unused(ethernet_buffer_t *buffer)
+{
+    assert(buffer != NULL);
+    assert(buffer->in_async_use);
+    assert(num_free_buffers <= NUM_BUFFERS);
+
+    if (!buffer->allocated) {
+        free_buffers[num_free_buffers] = buffer;
+        num_free_buffers += 1;
+    }
+
+    buffer->in_async_use = false;
+}
+
+/*
+ * Ethernet device
+ * ===============
+ */
+
+static void tx_complete(void *iface, void *cookie)
+{
+    mark_buffer_unused(cookie);
+}
+
+static void rx_complete(
+    void *iface,
+    unsigned int num_bufs,
+    void **cookies,
+    unsigned int *lens
+) {
+    for (int b = 0; b < num_bufs; b += 1) {
+        ethernet_buffer_t *buffer = cookies[b];
+        mark_buffer_unused(buffer);
+        interface_receive(buffer, lens[b]);
+    }
+}
+
+static uintptr_t allocate_rx_buf(
+    void *iface,
+    size_t buf_size,
+    void **cookie
+) {
+    ethernet_buffer_t *buffer = alloc_buffer(buf_size);
+    if (buffer == NULL) {
+        return 0;
+    }
+
+    /* Buffer now used for receive */
+    mark_buffer_used(buffer);
+
+    /* Invalidate the memory */
+    ps_dma_cache_invalidate(
+        &ops->dma_manager,
+        buffer->buffer,
+        buf_size
+    );
+    *cookie = buffer;
+    return buffer->phys;
+}
+
+/*
+ * Network interface
+ * =================
+ */
+
+static void interface_receive(ethernet_buffer_t *buffer, size_t length)
+{
+    /* If we wanted to add a queue, we'd do so in here */
+    struct pbuf *p = create_interface_buffer(buffer, length);
+
+    if (netif.input(p, &netif) != ERR_OK) {
+        /* If it is successfully received, the receiver controls whether
+         * or not it gets freed. */
+        pbuf_free(p);
+    }
+}
+
+static struct pbuf *create_interface_buffer(
+    ethernet_buffer_t *buffer,
+    size_t length
+) {
+    lwip_custom_pbuf_t *custom_pbuf =
+        (lwip_custom_pbuf_t *) LWIP_MEMPOOL_ALLOC(RX_POOL);
+
+    custom_pbuf->buffer = buffer;
+    custom_pbuf->custom.custom_free_function = interface_free_buffer;
+
+    return pbuf_alloced_custom(
+        PBUF_RAW,
+        length,
+        PBUF_REF,
+        &custom_pbuf->custom,
+        buffer->buffer,
+        buffer->size
+    );
+}
+
+static void interface_free_buffer(struct pbuf *buf)
+{
+    SYS_ARCH_DECL_PROTECT(old_level);
+
     lwip_custom_pbuf_t *custom_pbuf = (lwip_custom_pbuf_t *) buf;
 
-    if (!custom_pbuf->is_echo) {
-        rx_buf_pool[num_rx_bufs] = custom_pbuf->eth_buf;
-        num_rx_bufs++;
-    }
-
+    SYS_ARCH_PROTECT(old_level);
+    free_buffer(custom_pbuf->buffer);
     LWIP_MEMPOOL_FREE(RX_POOL, custom_pbuf);
+    SYS_ARCH_UNPROTECT(old_level);
 }
 
-/* Async driver will set a flag to signal that there is work to be done  */
-static void lwip_eth_poll(struct netif *netif)
-{
-    int len;
-    while (1) {
-        int done;
-        if (pending_rx_head == pending_rx_tail) {
-            break;
-        }
-
-        eth_buf_t *rx = pending_rx[pending_rx_tail];
-        lwip_custom_pbuf_t *custom_pbuf = (lwip_custom_pbuf_t *) LWIP_MEMPOOL_ALLOC(RX_POOL);
-        ZF_LOGF_IF(custom_pbuf == NULL, "Failed to allocate custom pbuf");
-        custom_pbuf->p.custom_free_function = lwip_free_buf;
-        custom_pbuf->eth_buf = rx;
-        struct pbuf *p = pbuf_alloced_custom(PBUF_RAW, rx->len, PBUF_REF, &custom_pbuf->p, rx->buf, BUF_SIZE);
-
-        if (netif->input(p, netif) != ERR_OK) {
-            ZF_LOGE("Failed to give pbuf to lwIP");
-            pbuf_free(p);
-            break;
-        } else {
-            pending_rx_tail = (pending_rx_tail + 1) % RX_BUFS;
-        }
-    }
-}
-
-static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
-{
-    if (p->tot_len > BUF_SIZE) {
-        ZF_LOGF("len %hu is invalid in lwip_eth_send", p->tot_len);
-        return ERR_MEM;
-    }
-
-    uintptr_t phys;
-    void *cookie = NULL;
-    unsigned int len;
-
-    /* zero-copy TX, keep in mind this is a hack that assumes that the buffer
-     * size is 2048 and also that the payload is less than 2048 */
-    int num_pbufs = 0;
-    for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
-        num_pbufs++;
-    }
-
-    if (num_pbufs != 2 && num_tx == 0) {
-        // No Ethernet frame buffers available
-        return ERR_MEM;
-    }
-
-    if (num_pbufs == 2) {
-        struct pbuf *first_pbuf = p;
-        struct pbuf *second_pbuf = p->next;
-        ZF_LOGF_IF(second_pbuf->flags & PBUF_FLAG_IS_CUSTOM == 0, "second pbuf not custom!");
-        ZF_LOGF_IF((uintptr_t) second_pbuf->payload & 0xff != 42, "second pbuf not offset by 42!");
-        ZF_LOGF_IF(first_pbuf->len != 42, "first pbuf not 42!");
-        lwip_custom_pbuf_t *custom_pbuf = (lwip_custom_pbuf_t *) second_pbuf;
-        eth_buf_t *rx_buf = custom_pbuf->eth_buf;
-        memcpy(rx_buf->buf, first_pbuf->payload, 42);
-        len = first_pbuf->tot_len;
-        //phys = rx_buf->phys;
-        phys = ps_dma_pin(&ops->dma_manager, rx_buf->buf, len);
-        cookie = rx_buf;
-        ps_dma_cache_clean(&ops->dma_manager, rx_buf->buf, len);
-    } else {
-        num_tx--;
-        eth_buf_t *tx_buf = tx_buf_pool[num_tx];
-        /* copy the packet over */
-        pbuf_copy_partial(p, tx_buf->buf, p->tot_len, 0);
-        len = p->tot_len;
-        //phys = tx_buf->phys;
-        phys = ps_dma_pin(&ops->dma_manager, tx_buf->buf, len);
-        cookie = tx_buf;
-        ps_dma_cache_clean(&ops->dma_manager, tx_buf->buf, len);
-    }
-
-    if (!phys) {
-        ZF_LOGF("Failed to pin the dma buf for sending");
-    }
-
-    int err = eth_driver->i_fn.raw_tx(eth_driver, 1, &phys, &len, cookie);
-
-    switch (err) {
-    case ETHIF_TX_FAILED:
-        ZF_LOGF_IF(cookie == NULL, "cookie is NULL!");
-        eth_tx_complete(NULL, cookie);
-        return ERR_MEM;
-    case ETHIF_TX_COMPLETE:
-    case ETHIF_TX_ENQUEUED:
-        break;
-    }
-    return ERR_OK;
-}
-
-static void tick_on_event()
-{
-    lwip_eth_poll(&netif);
-}
-
-static int hardware_interface_searcher(void *cookie, void *interface_instance, char **properties)
-{
-    eth_driver = interface_instance;
-    return PS_INTERFACE_FOUND_MATCH;
-}
-
-static err_t ethernet_init(struct netif *netif)
+static err_t interface_init(struct netif *netif)
 {
     if (netif == NULL) {
         return ERR_ARG;
@@ -290,11 +336,135 @@ static err_t ethernet_init(struct netif *netif)
     netif->mtu = 1500;
     netif->hwaddr_len = ETHARP_HWADDR_LEN;
     netif->output = etharp_output;
-    netif->linkoutput = lwip_eth_send;
+    netif->linkoutput = interface_eth_send;
     NETIF_INIT_SNMP(netif, snmp_ifType_ethernet_csmacd, LINK_SPEED);
-    netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_LINK_UP | NETIF_FLAG_IGMP;
+    netif->flags =
+        ( NETIF_FLAG_BROADCAST
+        | NETIF_FLAG_ETHARP
+        | NETIF_FLAG_LINK_UP
+        | NETIF_FLAG_IGMP
+        );
 
     return ERR_OK;
+}
+
+static err_t interface_eth_send(struct netif *netif, struct pbuf *p)
+{
+    err_t ret = ERR_OK;
+
+    if (p->tot_len > BUF_SIZE) {
+        ZF_LOGF("len %hu is invalid in lwip_eth_send", p->tot_len);
+        return ERR_MEM;
+    }
+
+    /* TODO: Just get the driver to handle scatter-gather rather than us
+     * merging manually :/ */
+
+    /*
+     * If the largest pbuf is a custom pbuf and the remaining pbufs can
+     * be packed around it into the allocation, they are copied into the
+     * ethernet frame, otherwise we allocate a new buffer and copy
+     * everything.
+     */
+
+    size_t copy_before = 0;
+    size_t space_after = 0;
+    ethernet_buffer_t *buffer = NULL;
+    unsigned char *frame = NULL;
+    for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
+        if (frame == NULL && curr->flags & PBUF_FLAG_IS_CUSTOM) {
+            /* We've reached a custom pbuf */
+            lwip_custom_pbuf_t *custom = (lwip_custom_pbuf_t *) curr;
+
+            uintptr_t payload = (uintptr_t)curr->payload;
+            uintptr_t buffer_start = (uintptr_t)custom->buffer->buffer;
+            uintptr_t buffer_end = buffer_start + custom->buffer->size;
+            size_t space_before = payload - buffer_start;
+            space_after = buffer_end - (payload + curr->len);
+
+            if (space_before >= copy_before) {
+                buffer = custom->buffer;
+                frame = (void *)(payload - copy_before);
+            }
+        } else if (frame == NULL) {
+            /* Haven't found a copy candidate yet */
+            copy_before += curr->len;
+        } else {
+            /* Already found a copy candidate */
+            if (space_after > curr->len) {
+                space_after -= curr->len;
+            } else {
+                frame = NULL;
+                buffer = NULL;
+                break;
+            }
+        }
+    }
+
+    /*
+     * We need to allocate a new buffer if a suitable one wasn't found.
+     */
+    bool buffer_allocated = false;
+    if (buffer == NULL) {
+        buffer = alloc_buffer(p->tot_len);
+        if (buffer == NULL) {
+            ZF_LOGF("Out of ethernet memory");
+            return ERR_MEM;
+        }
+        // TODO: This shouldn't be needed here but may make more
+        // comparible to two-component implementation
+        ps_dma_cache_invalidate(
+            &ops->dma_manager,
+            buffer->buffer,
+            p->tot_len
+        );
+        frame = buffer->buffer;
+        buffer_allocated = true;
+    }
+
+    /* Copy all buffers that need to be copied */
+    unsigned int copied = 0;
+    for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
+        unsigned char *buffer_dest = &frame[copied];
+        if ((uintptr_t)buffer_dest != (uintptr_t)curr->payload) {
+            /* Don't copy memory back into the same location */
+            memcpy(buffer_dest, curr->payload, curr->len);
+        }
+        copied += curr->len;
+    }
+    ps_dma_cache_clean(&ops->dma_manager, frame, copied);
+
+    mark_buffer_used(buffer);
+    uintptr_t phys = buffer->phys;
+    int err = eth_driver->i_fn.raw_tx(
+        eth_driver,
+        1,
+        &phys,
+        &copied,
+        buffer
+    );
+
+    switch (err) {
+    case ETHIF_TX_FAILED:
+        tx_complete(NULL, buffer);
+        ret = ERR_MEM;
+        break;
+    case ETHIF_TX_COMPLETE:
+    case ETHIF_TX_ENQUEUED:
+        break;
+    }
+
+error:
+    if (buffer_allocated) {
+        free_buffer(buffer);
+    }
+    return ret;
+}
+
+static int hardware_interface_searcher(void *cookie, void *interface_instance, char **properties)
+{
+    eth_driver = interface_instance;
+    return PS_INTERFACE_FOUND_MATCH;
 }
 
 static void netif_status_callback(struct netif *netif)
@@ -314,61 +484,38 @@ int setup_e0(ps_io_ops_t *io_ops)
     if (error) {
         ZF_LOGE("Unable to find an ethernet device");
         return -1;
-
     }
 
     /* preallocate buffers */
-    for (int i = 0; i < RX_BUFS; i++) {
-        eth_buf_t *buf = &rx_bufs[i];
-        buf->buf = ps_dma_alloc(&io_ops->dma_manager, BUF_SIZE, 64, 1, PS_MEM_NORMAL);
-        if (!buf) {
-            ZF_LOGE("Failed to allocate RX buffer.");
+    LWIP_MEMPOOL_INIT(RX_POOL);
+    for (int b = 0; b < NUM_BUFFERS; b++) {
+        ethernet_buffer_t *buffer = &buffers[b];
+        buffer->buffer = ps_dma_alloc(
+            &io_ops->dma_manager,
+            BUFFER_SIZE,
+            64,
+            1,
+            PS_MEM_NORMAL
+        );
+        if (!buffer->buffer) {
+            ZF_LOGE("Failed to allocate buffer.");
             return -1;
 
         }
-        if (i == 0) {
-            rx_buf_base = buf->buf;
-        }
-        if (rx_buf_base > buf->buf) {
-            rx_buf_base = buf->buf;
-        }
-        if (rx_buf_top < buf->buf) {
-            rx_buf_top = buf->buf;
-        }
-        memset(buf->buf, 0, BUF_SIZE);
-        /*
-        buf->phys = ps_dma_pin(&io_ops->dma_manager, buf->buf, BUF_SIZE);
-        if (!buf->phys) {
-            ZF_LOGE("ps_dma_pin: Failed to return physical address.");
+        buffer->phys = ps_dma_pin(
+            &ops->dma_manager,
+            buffer->buffer,
+            BUFFER_SIZE
+        );
+        if (!buffer->buffer) {
+            ZF_LOGE("Failed to pin buffer.");
             return -1;
 
         }
-        */
-        rx_buf_pool[num_rx_bufs] = buf;
-        num_rx_bufs++;
-
-    }
-    rx_buf_top += BUF_SIZE;
-
-    for (int i = 0; i < TX_BUFS; i++) {
-        eth_buf_t *buf = &tx_bufs[i];
-        buf->buf = ps_dma_alloc(&io_ops->dma_manager, BUF_SIZE, 64, 1, PS_MEM_NORMAL);
-        if (!buf) {
-            ZF_LOGE("Failed to allocate TX buffer: %d.", i);
-            return -1;
-
-        }
-        memset(buf->buf, 0, BUF_SIZE);
-        /*
-        buf->phys = ps_dma_pin(&io_ops->dma_manager, buf->buf, BUF_SIZE);
-        if (!buf->phys) {
-            ZF_LOGE("ps_dma_pin: Failed to return physical address.");
-            return -1;
-
-        }
-        */
-        tx_buf_pool[num_tx] = buf;
-        num_tx++;
+        buffer->size = BUFFER_SIZE;
+        memset(buffer->buffer, 0, BUFFER_SIZE);
+        free_buffers[num_free_buffers] = buffer;
+        num_free_buffers++;
 
     }
 
@@ -377,8 +524,8 @@ int setup_e0(ps_io_ops_t *io_ops)
     eth_driver->i_cb = ethdriver_callbacks;
     eth_driver->i_fn.raw_poll(eth_driver);
 
-    LWIP_MEMPOOL_INIT(RX_POOL);
 
+    /* Configure the ethernet device */
     struct ip4_addr netmask, ipaddr, gw, multicast;
     ipaddr_aton("10.13.0.1", &gw);
     ipaddr_aton("0.0.0.0", &ipaddr);
@@ -389,10 +536,9 @@ int setup_e0(ps_io_ops_t *io_ops)
     netif.name[1] = '0';
 
     netif_add(&netif, &ipaddr, &netmask, &gw, &netif,
-              ethernet_init, ethernet_input);
+              interface_init, ethernet_input);
+    netif_set_status_callback(&netif, netif_status_callback);
     netif_set_default(&netif);
-
-    single_threaded_component_register_handler(0, "sys_check_timeouts", tick_on_event, NULL);
 
     error = trace_extra_point_register_name(0, "inet_pseudo_chksum");
     ZF_LOGF_IF(error, "Failed to register extra trace point 0");

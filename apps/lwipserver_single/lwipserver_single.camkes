@@ -108,7 +108,7 @@ assembly {
         time_server.timers_per_client = 8;
 
         // ethdriver.trace_stop_priority = 255;
-        // ethdriver.enable_tracing = 1;
+        ethdriver.enable_tracing = 1;
 
         BenchUtiliz_trace_configurations(trace, ethdriver, 103)
 
