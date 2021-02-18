@@ -26,10 +26,77 @@ import <SerialServer/SerialServer.camkes>;
 
 #include <echo/tuning_params.h>
 
+HARDWARE_ETHERNET_EXTRA_IMPORTS
+
+component HWEthDriver82574 {
+    hardware;
+    emits IRQ irq;
+    dataport Buf(0x20000) mmio;
+};
+
+component Ethdriver82574_1 {
+    single_threaded_component()
+    dynamic_untyped_allocators_interfaces(init_dynamic)
+    x86_iospace_dma_interfaces(init_iospaces, "0x12:0x0:0x19:0")
+    lwip_base_interfaces(lwip_base)
+    SerialServer_putchar_printf_client(putchar)
+    /*
+     * The promiscuous mode is set according to whatever configuration you want, 1 by default.
+     */
+     attribute int promiscuous_mode = 1;
+
+    consumes IRQ irq;
+    dataport Buf(0x20000) EthDriver;
+    dataport Buf cached_dma;
+
+    uses IdleThread idle;
+
+
+    /* MMIO and IRQ default values */
+    attribute int mmio_paddr = 0xf7f00000;
+    attribute int mmio_size = 0x20000;
+    attribute string irq_irq_type = "pci";
+    attribute int irq_irq_ioapic = 0;
+    attribute int irq_irq_ioapic_pin = 20;
+    attribute int irq_irq_vector = 20;
+
+    attribute int simple = 1;
+    attribute int cnode_size_bits = 14;
+    attribute int simple_untyped20_pool = 2;
+    attribute int heap_size = HEAP_SIZE;
+
+    attribute int dma_pool = DMA_ALLOC_SIZE;
+    attribute int dma_pool_cached = 1;
+
+
+    composition {
+        component HWEthDriver82574 hwethdriver;
+        connection seL4HardwareMMIO ethdrivermmio(from EthDriver, to hwethdriver.mmio);
+        connection seL4GlobalAsynchHardwareInterrupt hwethirq(from hwethdriver.irq, to irq);
+        dynamic_untyped_allocators_connections(init_dynamic)
+        x86_iospace_dma_connections(init_iospaces)
+
+
+    }
+    configuration {
+        hwethdriver.mmio_paddr <- mmio_paddr;
+        hwethdriver.mmio_size <- mmio_size;
+        hwethdriver.irq_irq_type <- irq_irq_type;
+        hwethdriver.irq_irq_ioapic <- irq_irq_ioapic;
+        hwethdriver.irq_irq_ioapic_pin <- irq_irq_ioapic_pin;
+        hwethdriver.irq_irq_vector <- irq_irq_vector;
+        dynamic_untyped_allocators_configuration(init_dynamic)
+        x86_iospace_dma_configuration(init_iospaces)
+   }
+}
+
 component FDT_device {
     hardware;
     emits FDT resource;
 }
+
+/* This is a macro used to define the hardware CAmkES component for each ARM platform */
+HARDWARE_ETHERNET_COMPONENT
 
 component EthdriverARMPlat_1 {
     single_threaded_component()
@@ -45,14 +112,13 @@ component EthdriverARMPlat_1 {
     attribute int heap_size = 0x10000;
     attribute int dma_pool = 0x20000;
 
-    dataport Buf cached_dma_pool;
-
-    consumes FDT EthDriver;
+	consumes FDT EthDriver;
 	consumes FDT ocotp;
     consumes FDT iomux;
     consumes FDT ccm;
     consumes FDT analog;
     consumes FDT gpio1;
+    dataport Buf cached_dma;
     fdt_bind_drivers_interfaces(["/ethernet@30be0000"]);
 
     composition {
@@ -68,7 +134,7 @@ component EthdriverARMPlat_1 {
 
     configuration {
         EthDriver.dtb = dtb({ "path" : "/ethernet@30be0000" });
-    	EthDriver.generate_interrupts = 1;
+        EthDriver.generate_interrupts = 1;
         ocotp.dtb = dtb({ "path" : "/ocotp-ctrl@30350000" });
         iomux.dtb = dtb({ "path" : "/iomuxc@30330000" });
         ccm.dtb = dtb({ "path" : "/ccm@30380000" });
@@ -84,7 +150,12 @@ component Dummy {
 assembly {
     composition {
 
+#ifdef KernelArchArm
         component EthdriverARMPlat_1 ethdriver;
+#endif
+#ifdef KernelArchX86
+        component Ethdriver82574_1 ethdriver;
+#endif
         component Dummy dummy;
 
         component TimeServer time_server;
@@ -93,10 +164,9 @@ assembly {
 
         connection seL4TimeServer serialserver_timer (from serial_server.timeout, to time_server.the_timer);
         SerialServer_processed_putchar_printf_connection(putchar, ethdriver, serial_server)
-        connection seL4DMASharedData dma_conn(from ethdriver.cached_dma_pool, to dummy.dma);
+        connection seL4DMASharedData dma_conn(from ethdriver.cached_dma, to dummy.dma);
 
         lwip_base_connections(ethdriver, lwip_base, time_server.the_timer)
-
         BenchUtiliz_trace_connections(trace, ethdriver, bench)
         BenchUtiliz_control_connections(idle, ethdriver, bench)
     }
@@ -107,15 +177,12 @@ assembly {
          */
         time_server.timers_per_client = 8;
 
-        // ethdriver.trace_stop_priority = 255;
-        ethdriver.enable_tracing = 1;
-
         BenchUtiliz_trace_configurations(trace, ethdriver, 103)
+        ethdriver.enable_tracing = 1;
 
         lwip_base_configuration(ethdriver, lwip_base, "", "0.0.0.0")
         //lwip_base_configuration(ethdriver, lwip_base, "10.0.2.15", "0.0.0.0")
-
-        dma_conn.size = 0x200000;
-        dma_conn.controller = "ethdriver.cached_dma_pool";
+        dma_conn.size = 0x800000;
+        dma_conn.controller = "ethdriver.cached_dma";
     }
 }
