@@ -37,6 +37,8 @@ DeclareCAmkESComponent(
     include
     LIBS
     ${libs}
+    LD_FLAGS
+    -Wl,--section-start=.note.gnu.build-id=0x400920
 )
 
 CAmkESAddCPPInclude("${CMAKE_CURRENT_LIST_DIR}/include/")
