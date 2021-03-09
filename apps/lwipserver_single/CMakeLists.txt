@@ -25,7 +25,8 @@ endif()
 include(${LWIP_HELPERS})
 AddLWIPConfiguration(${CMAKE_CURRENT_LIST_DIR}/lwip_include)
 
-set(libs sel4utils sel4vka sel4allocman sel4vspace sel4simple sel4platsupport ethdrivers lwip)
+set(libs sel4utils sel4vka sel4allocman sel4vspace sel4simple
+    sel4platsupport ethdrivers lwip sel4prof BenchUtiliz-profile)
 
 set(sources src/ethdriver.c src/tcp_echo_socket.c src/udp_echo_socket.c src/utilization_socket.c)
 

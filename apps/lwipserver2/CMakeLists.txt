@@ -25,7 +25,8 @@ endif()
 include(${LWIP_HELPERS})
 AddLWIPConfiguration(${CMAKE_CURRENT_LIST_DIR}/lwip_include)
 
-set(libs sel4utils sel4vka sel4allocman sel4vspace sel4simple sel4platsupport lwip)
+set(libs sel4utils sel4vka sel4allocman sel4vspace sel4simple
+    sel4platsupport lwip sel4prof BenchUtiliz-profile)
 
 set(sources src/tcp_echo_socket.c src/udp_echo_socket.c src/utilization_socket.c)
 
@@ -44,7 +45,7 @@ DeclareCAmkESComponent(
 CAmkESAddCPPInclude("${CMAKE_CURRENT_LIST_DIR}/include/")
 
 if(KernelSel4ArchX86_64)
-    DeclareCAmkESComponent(Ethdriver82574DF SOURCES x86_64_eth_init.c LIBS "${ETHDRIVER_LIBS}")
+    DeclareCAmkESComponent(Ethdriver82574DF SOURCES x86_64_eth_init.c LIBS "${ETHDRIVER_LIBS}" sel4prof)
     DeclareCAmkESRootserver(lwipserver2_x86_64.camkes CPP_FLAGS ${cpp_define})
 elseif(KernelPlatformImx8mq-evk)
     DeclareCAmkESRootserver(lwipserver2_imx8mq.camkes CPP_FLAGS ${cpp_define})
