@@ -172,6 +172,7 @@ assembly {
         BenchUtiliz_trace_connections(trace, ethdriver, bench)
         BenchUtiliz_control_connections(idle, ethdriver, bench)
         BenchUtiliz_profile_connections(bench, ethdriver)
+        BenchUtiliz_profile_connections(ethdriver, bench)
     }
 
     configuration {
