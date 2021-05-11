@@ -26,27 +26,11 @@ static char udp_data_packet[0x1000] ALIGN(0x1000);
 
 static struct udp_pcb *udp_socket;
 
-typedef struct lwip_custom_pbuf {
-    struct pbuf_custom p;
-    bool is_echo;
-    void *dma_buf;
-} lwip_custom_pbuf_t;
-
 static void lwip_udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
 {
-    if (p->flags & PBUF_FLAG_IS_CUSTOM) {
-        lwip_custom_pbuf_t *custom_pbuf = (lwip_custom_pbuf_t *) p;
-        custom_pbuf->is_echo = true;
-    }
-    //trace_extra_point_start(6);
-    //trace_extra_point_start(7);
     err_t error = udp_sendto(pcb, p, addr, port);
-    //trace_extra_point_end(7, 1);
     ZF_LOGF_IF(error, "Failed to send UDP packet through socket");
-    //trace_extra_point_start(4);
     pbuf_free(p);
-    //trace_extra_point_end(4, 1);
-    //trace_extra_point_end(6, 1);
 }
 
 int setup_udp_socket(UNUSED ps_io_ops_t *io_ops)
