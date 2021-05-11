@@ -411,13 +411,6 @@ static err_t interface_eth_send(struct netif *netif, struct pbuf *p)
             ZF_LOGF("Out of ethernet memory");
             return ERR_MEM;
         }
-        // TODO: This shouldn't be needed here but may make more
-        // comparible to two-component implementation
-        ps_dma_cache_invalidate(
-            &ops->dma_manager,
-            buffer->buffer,
-            p->tot_len
-        );
         frame = buffer->buffer;
         buffer_allocated = true;
     }
