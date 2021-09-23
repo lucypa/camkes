@@ -104,6 +104,7 @@ assembly {
     }
 
     configuration {
+        echo._priority = 100;
         lwipserver._priority = 99;
         ethdriver._priority = 98;
 
@@ -115,10 +116,10 @@ assembly {
 		lwip_ethernet_async_configurations(eth0, lwipserver, ethdriver)
 		lwipserver.heap_size = 0x40000;
 
-        BenchUtiliz_trace_configurations(trace, ethdriver, 103)
-        BenchUtiliz_trace_configurations(trace, lwipserver, 102)
+        //BenchUtiliz_trace_configurations(trace, ethdriver, 103)
+        //BenchUtiliz_trace_configurations(trace, lwipserver, 102)
 
-        ethdriver.enable_tracing = 1;
+        //ethdriver.enable_tracing = 1;
 
         lwip_base_configuration(lwipserver, lwip_base, "", "0.0.0.0")
     }
