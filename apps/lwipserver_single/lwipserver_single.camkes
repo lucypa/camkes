@@ -53,7 +53,7 @@ component Ethdriver82574_1 {
 
 
     /* MMIO and IRQ default values */
-    attribute int mmio_paddr = 0xf7f00000;
+    attribute int mmio_paddr = 0xf7cc0000;
     attribute int mmio_size = 0x20000;
     attribute string irq_irq_type = "pci";
     attribute int irq_irq_ioapic = 0;
@@ -136,8 +136,10 @@ component EthdriverARMPlat_1 {
         EthDriver.dtb = dtb({ "path" : "/ethernet@30be0000" });
         EthDriver.generate_interrupts = 1;
         ocotp.dtb = dtb({ "path" : "/ocotp-ctrl@30350000" });
-        iomux.dtb = dtb({ "path" : "/iomuxc@30330000" });
-        ccm.dtb = dtb({ "path" : "/ccm@30380000" });
+        // iomux.dtb = dtb({ "path" : "/iomuxc@30330000" });
+        iomux.dtb = dtb({ "path" : "/pinctrl@30330000" });
+        // ccm.dtb = dtb({ "path" : "/ccm@30380000" });
+        ccm.dtb = dtb({ "path" : "/clock-controller@30380000" });
         analog.dtb = dtb({ "path" : "/anatop@30360000" });
         gpio1.dtb = dtb({"path" : "/gpio@30200000"});
     }
