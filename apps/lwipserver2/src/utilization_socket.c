@@ -96,6 +96,11 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
     } else if (msg_match(data_packet, STOP)) {
         uint64_t total, kernel, idle;
         idle_stop(&total, &kernel, &idle);
+        printf("{\n");
+        printf("\"total\": %"PRIu64",\n", total);
+        printf("\"kernel\": %"PRIu64",\n", kernel);
+        printf("\"idle\": %"PRIu64"\n", idle);
+        printf("}\n");
         char *util_msg;
         int len = asprintf(&util_msg, IDLE_FORMAT, idle, total);
         if (len == -1) {
