@@ -247,6 +247,7 @@ static void rx_complete(
     void **cookies,
     unsigned int *lens
 ) {
+    
     for (int b = 0; b < num_bufs; b += 1) {
         ethernet_buffer_t *buffer = cookies[b];
         mark_buffer_unused(buffer);
@@ -302,6 +303,7 @@ static struct pbuf *create_interface_buffer(
         (lwip_custom_pbuf_t *) LWIP_MEMPOOL_ALLOC(RX_POOL);
 
     custom_pbuf->buffer = buffer;
+
     custom_pbuf->custom.custom_free_function = interface_free_buffer;
 
     return pbuf_alloced_custom(
@@ -366,14 +368,17 @@ static err_t interface_eth_send(struct netif *netif, struct pbuf *p)
      * ethernet frame, otherwise we allocate a new buffer and copy
      * everything.
      */
+     
+    ethernet_buffer_t *buffer = NULL;
+    unsigned char *frame = NULL;
 
-    size_t copy_before = 0;
+    /*size_t copy_before = 0;
     size_t space_after = 0;
     ethernet_buffer_t *buffer = NULL;
     unsigned char *frame = NULL;
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
         if (frame == NULL && curr->flags & PBUF_FLAG_IS_CUSTOM) {
-            /* We've reached a custom pbuf */
+            // We've reached a custom pbuf 
             lwip_custom_pbuf_t *custom = (lwip_custom_pbuf_t *) curr;
 
             uintptr_t payload = (uintptr_t)curr->payload;
@@ -387,10 +392,10 @@ static err_t interface_eth_send(struct netif *netif, struct pbuf *p)
                 frame = (void *)(payload - copy_before);
             }
         } else if (frame == NULL) {
-            /* Haven't found a copy candidate yet */
+            // Haven't found a copy candidate yet
             copy_before += curr->len;
         } else {
-            /* Already found a copy candidate */
+            // Already found a copy candidate 
             if (space_after > curr->len) {
                 space_after -= curr->len;
             } else {
@@ -399,7 +404,7 @@ static err_t interface_eth_send(struct netif *netif, struct pbuf *p)
                 break;
             }
         }
-    }
+    }*/
 
     /*
      * We need to allocate a new buffer if a suitable one wasn't found.
@@ -425,6 +430,7 @@ static err_t interface_eth_send(struct netif *netif, struct pbuf *p)
         }
         copied += curr->len;
     }
+
     ps_dma_cache_clean(&ops->dma_manager, frame, copied);
 
     mark_buffer_used(buffer);
