@@ -49,8 +49,6 @@ component Ethdriver82574_1 {
     dataport Buf(0x20000) EthDriver;
     dataport Buf cached_dma;
 
-    uses IdleThread idle;
-
 
     /* MMIO and IRQ default values */
     attribute int mmio_paddr = 0xf7cc0000;
