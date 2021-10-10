@@ -39,3 +39,10 @@
 
 /* Set this to 0 for performance */
 #define LWIP_STATS 0
+
+/* Debugging options */
+#define LWIP_DBG_TYPES_ON LWIP_DBG_ON
+#define NETIF_DEBUG LWIP_DBG_ON
+#define ETHARP_DEBUG LWIP_DBG_ON
+#define PBUF_DEBUG LWIP_DBG_ON
+#define UDP_DEBUG LWIP_DBG_ON
