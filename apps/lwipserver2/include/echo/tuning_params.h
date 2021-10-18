@@ -31,8 +31,9 @@
 /* DMA memory to use for descriptor rings */
 #define DMA_RING_ALLOC_SIZE 0x4000
 
-/* Total DMA memory to allocate */
+/* Total DMA memory to allocate =  */
 #define DMA_ALLOC_SIZE (DMA_RING_ALLOC_SIZE + BUF_SIZE * (TX_BUFS + RX_BUFS))
+
 
 /* Heap size */
 #define HEAP_SIZE 0x800000

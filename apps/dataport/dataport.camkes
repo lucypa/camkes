@@ -5,6 +5,12 @@
  */
 
 import <std_connector.camkes>;
+import <global-connectors.camkes>;
+import <TimeServer/TimeServer.camkes>;
+import <SerialServer/SerialServer.camkes>;
+
+#include <camkes-single-threaded.h>
+#include <camkes-BenchUtiliz.h>
 
 import "components/DataportTest/DataportTest.camkes";
 
@@ -15,6 +21,9 @@ assembly {
 
                 connection seL4SharedData simple1(from comp1.DataOut, to comp2.DataIn);
                 connection seL4SharedData simple2(from comp2.DataOut, to comp1.DataIn);
+        }
+        configuration {
+                BenchUtiliz_trace_configurations(trace, comp1, 103)
         }
 }
 

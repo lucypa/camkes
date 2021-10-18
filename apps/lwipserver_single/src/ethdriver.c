@@ -184,12 +184,14 @@ static inline ethernet_buffer_t *alloc_buffer(size_t length)
         if (buffer->size < length) {
             /* Requested size too large */
             num_free_buffers += 1;
+            ZF_LOGE("Cannot alloc buffer... Requested size too large");
             return NULL;
         } else {
             buffer->allocated = true;
             return buffer;
         }
     } else {
+        ZF_LOGE("Cannot alloc buffer... none available");
         return NULL;
     }
 }
@@ -199,6 +201,7 @@ static inline void free_buffer(ethernet_buffer_t *buffer)
     assert(buffer != NULL);
     assert(buffer->allocated);
     assert(num_free_buffers <= NUM_BUFFERS);
+
 
     if (!buffer->in_async_use) {
         free_buffers[num_free_buffers] = buffer;
@@ -213,7 +216,6 @@ static inline void mark_buffer_used(ethernet_buffer_t *buffer)
     assert(buffer != NULL);
     assert(buffer->allocated);
     assert(!buffer->in_async_use);
-
     buffer->in_async_use = true;
 }
 
@@ -284,13 +286,19 @@ static uintptr_t allocate_rx_buf(
  */
 
 static void interface_receive(ethernet_buffer_t *buffer, size_t length)
-{
+{   
+        /* Invalidate the memory */
+    ps_dma_cache_invalidate(
+        &ops->dma_manager,
+        buffer->buffer,
+        length
+    );
     /* If we wanted to add a queue, we'd do so in here */
     struct pbuf *p = create_interface_buffer(buffer, length);
-
     if (netif.input(p, &netif) != ERR_OK) {
         /* If it is successfully received, the receiver controls whether
          * or not it gets freed. */
+        ZF_LOGE("netif.input() != ERR_OK");
         pbuf_free(p);
     }
 }
@@ -305,7 +313,7 @@ static struct pbuf *create_interface_buffer(
     custom_pbuf->buffer = buffer;
 
     custom_pbuf->custom.custom_free_function = interface_free_buffer;
-
+    
     return pbuf_alloced_custom(
         PBUF_RAW,
         length,
@@ -374,8 +382,6 @@ static err_t interface_eth_send(struct netif *netif, struct pbuf *p)
 
     /*size_t copy_before = 0;
     size_t space_after = 0;
-    ethernet_buffer_t *buffer = NULL;
-    unsigned char *frame = NULL;
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
         if (frame == NULL && curr->flags & PBUF_FLAG_IS_CUSTOM) {
             // We've reached a custom pbuf 
@@ -449,11 +455,12 @@ static err_t interface_eth_send(struct netif *netif, struct pbuf *p)
         ret = ERR_MEM;
         break;
     case ETHIF_TX_COMPLETE:
+        tx_complete(NULL, buffer);
+        break;
     case ETHIF_TX_ENQUEUED:
         break;
     }
 
-error:
     if (buffer_allocated) {
         free_buffer(buffer);
     }
