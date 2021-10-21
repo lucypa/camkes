@@ -287,7 +287,7 @@ static uintptr_t allocate_rx_buf(
 
 static void interface_receive(ethernet_buffer_t *buffer, size_t length)
 {   
-        /* Invalidate the memory */
+    /* Invalidate the memory */
     ps_dma_cache_invalidate(
         &ops->dma_manager,
         buffer->buffer,
