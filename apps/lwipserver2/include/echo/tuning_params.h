@@ -26,7 +26,7 @@
 #define TCP_READ_SIZE 1400
 
 /* Max size of UDP socket reads */
-#define UDP_READ_SIZE 1400
+#define UDP_READ_SIZE 1500
 
 /* DMA memory to use for descriptor rings */
 #define DMA_RING_ALLOC_SIZE 0x4000
