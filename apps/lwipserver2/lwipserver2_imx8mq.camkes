@@ -36,12 +36,14 @@ component LWIPServer {
 	lwip_base_interfaces(lwip_base)
 	SerialServer_putchar_printf_client(putchar)
     BenchUtiliz_control_interfaces(idle)
+    /* BenchUtiliz_profile_interfaces */ 
 }
 
 component EthdriverARMPlatDF {
     single_threaded_component()
 	lwip_ethernet_async_server_interfaces(eth0)
     SerialServer_putchar_printf_client(putchar)
+    /* BenchUtiliz_profile_interfaces */ 
 
     attribute int simple = true;
     attribute int cnode_size_bits = 12;
@@ -103,12 +105,15 @@ assembly {
         BenchUtiliz_trace_connections(trace, lwipserver, bench)
         BenchUtiliz_trace_connections(trace, ethdriver, bench)
         BenchUtiliz_control_connections(idle, lwipserver, bench)
+        /* BenchUtiliz_profile_connections(bench, lwipserver)
+        BenchUtiliz_profile_connections(lwipserver, ethdriver)
+        BenchUtiliz_profile_connections(ethdriver, bench) */
     }
 
     configuration {
         echo._priority = 100;
-        lwipserver._priority = 99;
-        ethdriver._priority = 98;
+        lwipserver._priority = 100;
+        ethdriver._priority = 100;
 
         /*
          * Non-platform specific configurations
@@ -122,6 +127,7 @@ assembly {
         BenchUtiliz_trace_configurations(trace, lwipserver, 102)
 
         ethdriver.enable_tracing = 1;
+        lwipserver.enable_tracing = 1;
 
         lwip_base_configuration(lwipserver, lwip_base, "", "0.0.0.0")
     }

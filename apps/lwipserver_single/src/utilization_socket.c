@@ -92,17 +92,10 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         error = tcp_write(pcb, OK, strlen(OK), TCP_WRITE_FLAG_COPY);
         ZF_LOGF_IF(error, "Failed to send OK message through utilization peer");
     } else if (msg_match(data_packet, START)) {
-        //reset_irqs();
         idle_start();
     } else if (msg_match(data_packet, STOP)) {
         uint64_t total, kernel, idle;
         idle_stop(&total, &kernel, &idle);
-        /*printf("{\n");
-        printf("\"total\": %"PRIu64",\n", total);
-        printf("\"kernel\": %"PRIu64",\n", kernel);
-        printf("\"idle\": %"PRIu64"\n", idle);
-        printf("}\n");*/
-        //get_irqs();
 
         char *util_msg;
         int len = asprintf(&util_msg, IDLE_FORMAT, idle, total);
