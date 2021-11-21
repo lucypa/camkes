@@ -271,12 +271,13 @@ static uintptr_t allocate_rx_buf(
     mark_buffer_used(buffer);
 
     /* Invalidate the memory */
+    *cookie = buffer;
     ps_dma_cache_invalidate(
         &ops->dma_manager,
         buffer->buffer,
         buf_size
     );
-    *cookie = buffer;
+    //*cookie = buffer;
     return buffer->phys;
 }
 
@@ -287,7 +288,9 @@ static uintptr_t allocate_rx_buf(
 
 static void interface_receive(ethernet_buffer_t *buffer, size_t length)
 {   
-    /* Invalidate the memory */
+    /* Invalidate the memory. This second invalidate may or may not be
+    necessary. On arm, stale data comes up without this, and I suspect this
+    is because of the prefetcher working in the background during dma. */
     ps_dma_cache_invalidate(
         &ops->dma_manager,
         buffer->buffer,
@@ -546,11 +549,7 @@ int setup_e0(ps_io_ops_t *io_ops)
     netif_set_status_callback(&netif, netif_status_callback);
     netif_set_default(&netif);
 
-    error = trace_extra_point_register_name(0, "inet_pseudo_chksum");
-    ZF_LOGF_IF(error, "Failed to register extra trace point 0");
-
     return 0;
-
 }
 
 CAMKES_POST_INIT_MODULE_DEFINE(install_eth_device, setup_e0);
