@@ -370,9 +370,6 @@ static err_t interface_eth_send(struct netif *netif, struct pbuf *p)
         return ERR_MEM;
     }
 
-    /* TODO: Just get the driver to handle scatter-gather rather than us
-     * merging manually :/ */
-
     /*
      * If the largest pbuf is a custom pbuf and the remaining pbufs can
      * be packed around it into the allocation, they are copied into the
@@ -382,38 +379,6 @@ static err_t interface_eth_send(struct netif *netif, struct pbuf *p)
      
     ethernet_buffer_t *buffer = NULL;
     unsigned char *frame = NULL;
-
-    /*size_t copy_before = 0;
-    size_t space_after = 0;
-    for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
-        if (frame == NULL && curr->flags & PBUF_FLAG_IS_CUSTOM) {
-            // We've reached a custom pbuf 
-            lwip_custom_pbuf_t *custom = (lwip_custom_pbuf_t *) curr;
-
-            uintptr_t payload = (uintptr_t)curr->payload;
-            uintptr_t buffer_start = (uintptr_t)custom->buffer->buffer;
-            uintptr_t buffer_end = buffer_start + custom->buffer->size;
-            size_t space_before = payload - buffer_start;
-            space_after = buffer_end - (payload + curr->len);
-
-            if (space_before >= copy_before) {
-                buffer = custom->buffer;
-                frame = (void *)(payload - copy_before);
-            }
-        } else if (frame == NULL) {
-            // Haven't found a copy candidate yet
-            copy_before += curr->len;
-        } else {
-            // Already found a copy candidate 
-            if (space_after > curr->len) {
-                space_after -= curr->len;
-            } else {
-                frame = NULL;
-                buffer = NULL;
-                break;
-            }
-        }
-    }*/
 
     /*
      * We need to allocate a new buffer if a suitable one wasn't found.
